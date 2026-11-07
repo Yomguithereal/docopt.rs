@@ -672,6 +672,35 @@ pub enum Argument {
 }
 
 impl Pattern {
+    // Returns the positional atom and whether at least one value is required
+    // for the three spellings below:
+    //
+    //     ARG...       [ARG]...       [ARG...]
+    //
+    // This is deliberately limited to a positional at the end of a sequence.
+    // A repeat in the middle of a pattern has to leave states for every split
+    // point so that the following pattern can be matched.
+    fn terminal_variadic_positional(&self) -> Option<(&Atom, bool)> {
+        match *self {
+            Repeat(ref p) => match &**p {
+                PatAtom(ref a @ Positional(_)) => Some((a, true)),
+                Optional(ref ps) if ps.len() == 1 => match &ps[0] {
+                    &PatAtom(ref a @ Positional(_)) => Some((a, false)),
+                    _ => None,
+                },
+                _ => None,
+            },
+            Optional(ref ps) if ps.len() == 1 => match &ps[0] {
+                &Repeat(ref p) => match &**p {
+                    PatAtom(ref a @ Positional(_)) => Some((a, false)),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     fn add_options_shortcut(&mut self, par: &Parser) {
         fn add(pat: &mut Pattern, all_atoms: &HashSet<Atom>, par: &Parser) {
             match *pat {
@@ -1283,6 +1312,29 @@ impl<'a, 'b> Matcher<'a, 'b> {
             |(flag, count)| count <= &state.max_counts[flag])
     }
 
+    // A variadic positional at the end cannot usefully stop before the end of
+    // argv: only the state that consumes every remaining positional can pass
+    // `state_consumed_all_argv`. Consume it in one state instead of building
+    // one MState (and one growing Value::List) per prefix.
+    fn terminal_variadic_positional(&self, pat: &Pattern, init: &MState)
+        -> Option<MState> {
+        let (atom, required) = pat.terminal_variadic_positional()?;
+        let mut state = init.clone();
+        let mut consumed = 0;
+        while let Some(tok) = self.token_from(&state) {
+            let tok = state.match_cmd_or_posarg(atom, tok)?;
+            if !self.add_value(&mut state, atom, &tok.atom, &tok.arg) {
+                return None
+            }
+            consumed += 1;
+        }
+        if required && consumed == 0 {
+            None
+        } else {
+            Some(state)
+        }
+    }
+
     fn states(&self, pat: &Pattern, init: &MState) -> Vec<MState> {
         match *pat {
             Alternates(ref ps) => {
@@ -1297,11 +1349,26 @@ impl<'a, 'b> Matcher<'a, 'b> {
                 let mut iter = ps.iter();
                 match iter.next() {
                     None => return vec!(init.clone()),
+                    Some(p) if iter.len() == 0 => {
+                        if p.terminal_variadic_positional().is_some() {
+                            return self.terminal_variadic_positional(p, init)
+                                       .into_iter().collect()
+                        }
+                        states.extend(self.states(p, init).into_iter());
+                    }
                     Some(p) => states.extend(self.states(p, init).into_iter()),
                 }
-                for p in iter {
+                let remaining = iter.len();
+                for (i, p) in iter.enumerate() {
                     for s in states.into_iter() {
-                        next.extend(self.states(p, &s).into_iter());
+                        if i + 1 == remaining
+                           && p.terminal_variadic_positional().is_some() {
+                            next.extend(
+                                self.terminal_variadic_positional(p, &s)
+                                    .into_iter());
+                        } else {
+                            next.extend(self.states(p, &s).into_iter());
+                        }
                     }
                     states = vec!();
                     states.extend(next.into_iter());

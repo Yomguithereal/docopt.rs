@@ -131,6 +131,16 @@ fn regression_issue_219() {
 }
 
 #[test]
+fn regression_variadic_positional_is_linear() {
+    let argv: Vec<String> = (0..10_000).map(|n| n.to_string()).collect();
+    let values = Docopt::new("Usage: prog <arg>...").unwrap()
+        .argv(std::iter::once("prog".to_string()).chain(argv.iter().cloned()))
+        .parse().unwrap();
+
+    assert_eq!(values.get_vec("<arg>"), argv);
+}
+
+#[test]
 fn test_unit_struct() {
     const USAGE: &'static str = "
     Usage:
