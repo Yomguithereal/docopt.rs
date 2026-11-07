@@ -1,11 +1,11 @@
 [package]
-name = "docopt"
-version = "1.1.1"  #:version
-authors = ["Andrew Gallant <jamslam@gmail.com>"]
+name = "xan_docopt"
+version = "1.1.2"  #:version
+authors = ["Andrew Gallant <jamslam@gmail.com>", "Guillaume Plique <guillaume.plique@sciencespo.fr>"]
 description = "Command line argument parsing."
-documentation = "http://burntsushi.net/rustdoc/docopt/"
-homepage = "https://github.com/docopt/docopt.rs"
-repository = "https://github.com/docopt/docopt.rs"
+documentation = "https://github.com/Yomguithereal/docopt.rs"
+homepage = "https://github.com/Yomguithereal/docopt.rs"
+repository = "https://github.com/Yomguithereal/docopt.rs"
 readme = "README.md"
 keywords = ["docopt", "argument", "command", "argv"]
 categories = ["command-line-interface"]

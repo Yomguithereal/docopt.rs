@@ -1,3 +1,5 @@
+This version of the crate only contains a fix for the quadratic issue wrt variadic positionals.
+
 # THIS CRATE IS UNMAINTAINED
 
 This crate is unlikely to see significant future evolution. The primary reason
